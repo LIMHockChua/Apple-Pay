@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import PassKit
 
 class ViewController: UIViewController {
     
@@ -30,10 +31,43 @@ class ViewController: UIViewController {
     @IBOutlet weak var shoePickerView: UIPickerView!
     @IBOutlet weak var priceLabel: UILabel!
     
+    func displayDefaultAlert(title: String?, message: String?) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+       let okAction = UIAlertAction(title: "Ok", style: .default, handler: nil)
+        alert.addAction(okAction)
+        self.present(alert, animated: true, completion: nil)
+    }
     
     @IBAction func buyShoeTapped(_ sender: UIButton) {
         
         // Open Apple Pay purchase
+        let selectedIndex = shoePickerView.selectedRow(inComponent: 0)
+        let shoe = shoeData[selectedIndex]
+        let paymentItem = PKPaymentSummaryItem.init(label: shoe.name, amount: NSDecimalNumber(value: shoe.price))
+        
+        let paymentNetworks = [PKPaymentNetwork.amex, .discover, .masterCard, .visa]
+        
+        if PKPaymentAuthorizationViewController.canMakePayments(usingNetworks: paymentNetworks) {
+        } else {
+            displayDefaultAlert(title: "Error", message: "Unable to make Apple Pay transaction.")
+        }
+        
+        if PKPaymentAuthorizationViewController.canMakePayments(usingNetworks: paymentNetworks) {
+        let request = PKPaymentRequest()
+            request.currencyCode = "USD" // 1
+            request.countryCode = "US" // 2
+            request.merchantIdentifier = "merchant.com.examples.Apple-Pay" // 3
+            request.merchantCapabilities = PKMerchantCapability.capability3DS // 4
+            request.supportedNetworks = paymentNetworks // 5
+            request.paymentSummaryItems = [paymentItem] // 6
+            
+            guard let paymentVC = PKPaymentAuthorizationViewController(paymentRequest: request) else {
+                displayDefaultAlert(title: "Error", message: "Unable to present Apple Pay authorization.")
+                return
+                }
+                paymentVC.delegate = self
+                self.present(paymentVC, animated: true, completion: nil)
+        }
         
     }
     
@@ -45,6 +79,16 @@ class ViewController: UIViewController {
         
     }
     
+}
+
+
+extension ViewController: PKPaymentAuthorizationViewControllerDelegate {
+    func paymentAuthorizationViewControllerDidFinish(_ controller: PKPaymentAuthorizationViewController) {
+        dismiss(animated: true, completion: nil)    }
+    func paymentAuthorizationViewController(_ controller: PKPaymentAuthorizationViewController, didAuthorizePayment payment: PKPayment, handler completion: @escaping (PKPaymentAuthorizationResult) -> Void) {
+        dismiss(animated: true, completion: nil)
+        displayDefaultAlert(title: "Success!", message: "The Apple Pay transaction was complete.")
+    }
 }
 
 extension ViewController: UIPickerViewDataSource, UIPickerViewDelegate {
@@ -69,3 +113,4 @@ extension ViewController: UIPickerViewDataSource, UIPickerViewDelegate {
         priceLabel.text = "Price = $\(priceString)"
     }
 }
+
